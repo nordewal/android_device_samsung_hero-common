@@ -26,8 +26,34 @@
 #define LOG_TAG "CameraWrapper"
 #include <cutils/log.h>
 
+#include <camera/CameraMetadata.h>
 #include <hardware/camera3.h>
 #include <utils/threads.h>
+
+/* Samsung tags */
+#define SAMSUNG_CONTROL_LIVE_HDR_LEVEL_RANGE                        0x80000001
+#define SAMSUNG_CONTROL_LIVE_HDR_LEVEL                              0x80000002
+
+#define SAMSUNG_CONTROL_METERING_AVAILABLE_MODE                     0x80000003
+#define SAMSUNG_CONTROL_METERING_MODE                               0x80000004
+
+#define SAMSUNG_CONTROL_PAF_AVAILABLE_MODE                          0x80000005
+#define SAMSUNG_CONTROL_PAF_MODE                                    0x80000006
+
+#define SAMSUNG_LENS_OPTICAL_STABILIZATION_OPERATION_MODE           0x80010000
+#define SAMSUNG_LENS_AVAILABLE_OPTICAL_STABILIZATION_OPERATION_MODE 0x80020000
+
+/* Samsung tags values */
+#define SAMSUNG_CONTROL_METERING_MODE_CENTER 0
+#define SAMSUNG_CONTROL_METERING_MODE_SPORT  1
+#define SAMSUNG_CONTROL_METERING_MODE_MATRIX 2
+#define SAMSUNG_CONTROL_METERING_MODE_MANUAL 3
+
+#define SAMSUNG_LENS_OPTICAL_STABILIZATION_OPERATION_MODE_PICTURE 0
+#define SAMSUNG_LENS_OPTICAL_STABILIZATION_OPERATION_MODE_VIDEO   1
+
+#define SAMSUNG_CONTROL_PAF_MODE_OFF 0
+#define SAMSUNG_CONTROL_PAF_MODE_ON  1
 
 static android::Mutex gCameraWrapperLock;
 static camera_module_t *gVendorModule = 0;
@@ -134,7 +160,28 @@ const camera_metadata_t * camera_construct_default_request_settings(
 
     ALOGV("%s->%08X->%08X", __FUNCTION__, (uintptr_t)device, (uintptr_t)(((wrapper_camera_device_t*)device)->vendor));
 
-    return VENDOR_CALL(device, construct_default_request_settings, type);
+    android::CameraMetadata metadata;
+    metadata = VENDOR_CALL(device, construct_default_request_settings, type);
+
+    /* enable dual pixel autofocus by default */
+    int32_t pafMode[1] = {SAMSUNG_CONTROL_PAF_MODE_ON};
+    metadata.update(SAMSUNG_CONTROL_PAF_MODE, pafMode, 1);
+
+    /* enable optical image stabilization by default */
+    uint8_t oisMode[1] = {ANDROID_LENS_OPTICAL_STABILIZATION_MODE_ON};
+    metadata.update(ANDROID_LENS_OPTICAL_STABILIZATION_MODE, oisMode, 1);
+
+    int32_t oisOpMode[1];
+    /* video mode ois */
+    if (type == CAMERA3_TEMPLATE_VIDEO_RECORD) {
+        oisOpMode[0] = SAMSUNG_LENS_OPTICAL_STABILIZATION_OPERATION_MODE_VIDEO;
+    /* picture mode ois */
+    } else {
+        oisOpMode[0] = SAMSUNG_LENS_OPTICAL_STABILIZATION_OPERATION_MODE_PICTURE;
+    }
+    metadata.update(SAMSUNG_LENS_OPTICAL_STABILIZATION_OPERATION_MODE, oisOpMode, 1);
+
+    return metadata.release();
 }
 
 int camera_process_capture_request(const struct camera3_device *device,
