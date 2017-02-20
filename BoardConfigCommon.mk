@@ -30,6 +30,9 @@ TARGET_NO_RADIOIMAGE := true
 # Audio HAL variant
 TARGET_AUDIOHAL_VARIANT := samsung
 
+# CameraWrapper
+TARGET_PROVIDES_CAMERA_HAL := true
+
 # Binder
 TARGET_USES_64_BIT_BINDER := true
 
